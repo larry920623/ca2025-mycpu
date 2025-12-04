@@ -278,7 +278,7 @@ class InstructionDecode extends Module {
   // TODO: Complete S-type immediate extension
   val immS = Cat(
     Fill(Parameters.DataBits - 12, instruction(31)),  // Sign extension
-    instruction(30, 25),                                  // High 7 bits
+    instruction(31, 25),                                  // High 7 bits
     instruction(11, 7)                                   // Low 5 bits
   )
 

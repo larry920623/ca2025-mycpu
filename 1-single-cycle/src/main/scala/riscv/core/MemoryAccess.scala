@@ -138,7 +138,12 @@ class MemoryAccess extends Module {
         // 1. Enable single byte strobe at appropriate position
         // 2. Shift byte data to correct position based on address
         writeStrobes(mem_address_index) := true.B
-        writeData := data(7, 0) << (mem_address_index << 3.U)
+        writeData := MuxLookup(mem_address_index, 0.U, Seq(
+          0.U -> Cat(0.U(24.W), data(7, 0)),
+          1.U -> Cat(0.U(16.W), data(7, 0), 0.U(8.W)),
+          2.U -> Cat(0.U(8.W),  data(7, 0), 0.U(16.W)),
+	  3.U -> Cat(data(7, 0), 0.U(24.W))
+	))
       }
       is(InstructionsTypeS.sh) {
         // TODO: Complete store halfword logic
@@ -148,13 +153,13 @@ class MemoryAccess extends Module {
           // TODO: Enable strobes for lower two bytes, no shifting needed
           writeStrobes(0) := true.B
           writeStrobes(1) := true.B
-          writeData := data(15, 0)
+          writeData := Cat(0.U(16.W), data(15, 0))
         }.otherwise {
           // Upper halfword (bytes 2-3)
           // TODO: Enable strobes for upper two bytes, apply appropriate shift
           writeStrobes(2) := true.B
           writeStrobes(3) := true.B
-          writeData := data(15, 0) << 16.U
+          writeData := Cat(data(15, 0), 0.U(16.W))
         }
       }
       is(InstructionsTypeS.sw) {

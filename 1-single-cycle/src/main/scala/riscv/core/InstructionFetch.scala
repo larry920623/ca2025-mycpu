@@ -36,7 +36,7 @@ class InstructionFetch extends Module {
   })
 
   // Program counter register (PC)
-  val pc = RegInit(ProgramCounter.EntryAddress)
+  val pc = RegInit(0.U(32.W))
 
   // ============================================================
   // [CA25: Exercise 9] PC Update Logic - Sequential vs Control Flow
