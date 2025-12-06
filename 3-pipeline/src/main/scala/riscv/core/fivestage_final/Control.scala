@@ -104,11 +104,11 @@ class Control extends Module {
     // 3. AND destination register is not x0
     // 4. AND destination register conflicts with ID source registers
     //
-    ((?) && // Either:
+    ((io.jump_instruction_id || io.memory_read_enable_ex) && // Either:
       // - Jump in ID needs register value, OR
       // - Load in EX (load-use hazard)
-      ? =/= 0.U &&                                 // Destination is not x0
-      (?)) // Destination matches ID source
+      io.rd_ex =/= 0.U &&                                 // Destination is not x0
+      (io.rd_ex === io.rs1_id || io.rd_ex === io.rs2_id)) // Destination matches ID source
     //
     // Examples triggering Condition 1:
     // a) Jump dependency: ADD x1, x2, x3 [EX]; JALR x0, x1, 0 [ID] → stall
@@ -125,10 +125,10 @@ class Control extends Module {
         // 3. Destination register is not x0
         // 4. Destination register conflicts with ID source registers
         //
-        (? &&                              // Jump instruction in ID
-          ? &&                          // Load instruction in MEM
-          ? =/= 0.U &&                                  // Load destination not x0
-          (?)) // Load dest matches jump source
+        (io.jump_instruction_id &&                              // Jump instruction in ID
+          io.memory_read_enable_mem &&                          // Load instruction in MEM
+          io.rd_mem =/= 0.U &&                                  // Load destination not x0
+          (io.rd_mem === io.rs1_id || io.rd_mem === io.rs2_id)) // Load dest matches jump source
         //
         // Example triggering Condition 2:
         // LW x1, 0(x2) [MEM]; NOP [EX]; JALR x0, x1, 0 [ID]
@@ -140,9 +140,9 @@ class Control extends Module {
     // - Flush ID/EX register (insert bubble)
     // - Freeze PC (don't fetch next instruction)
     // - Freeze IF/ID (hold current fetch result)
-    io.id_flush := ?
-    io.pc_stall := ?
-    io.if_stall := ?
+    io.id_flush := true.B
+    io.pc_stall := true.B
+    io.if_stall := true.B
 
   }.elsewhen(io.jump_flag) {
     // ============ Control Hazard (Branch Taken) ============
@@ -150,7 +150,7 @@ class Control extends Module {
     // Only flush IF stage (not ID) since branch resolved early
     // TODO: Which stage needs to be flushed when branch is taken?
     // Hint: Branch resolved in ID stage, discard wrong-path instruction
-    io.if_flush := ?
+    io.if_flush := true.B
     // Note: No ID flush needed - branch already resolved in ID!
     // This is the key optimization: 1-cycle branch penalty vs 2-cycle
   }
@@ -162,31 +162,48 @@ class Control extends Module {
   // detection logic implemented above
   //
   // Q1: Why do we need to stall for load-use hazards?
-  // A: [Student answer here]
+  // A: Because the data loaded from memory is only available at the MEM/WB stage.
+  //    Forwarding cannot provide the correct value to the EX stage immediately in
+  //    the next cycle, so the pipeline must stall for one cycle to wait for the
+  //    data to become available.
   // Hint: Consider data dependency and forwarding limitations
   //
   // Q2: What is the difference between "stall" and "flush" operations?
-  // A: [Student answer here]
+  // A: Stall freezes the pipeline registers and the PC so that instructions stay
+  //    in the same stage, while flush clears the pipeline register and inserts a
+  //    NOP to discard incorrect or unwanted instructions.
   // Hint: Compare their effects on pipeline registers and PC
   //
   // Q3: Why does jump instruction with register dependency need stall?
-  // A: [Student answer here]
+  // A: Because the jump target address depends on the register value, which may
+  //    not be available yet. The correct jump address can only be computed after
+  //    the dependent instruction finishes, so the pipeline must stall to avoid
+  //    jumping to an incorrect address.
   // Hint: When is jump target address available?
   //
   // Q4: In this design, why is branch penalty only 1 cycle instead of 2?
-  // A: [Student answer here]
+  // A: Because branch decisions are resolved in the ID stage instead of the EX
+  //    stage. With early branch resolution and ID-stage forwarding, only the IF
+  //    stage needs to be flushed, reducing the branch penalty to 1 cycle.
   // Hint: Compare ID-stage vs EX-stage branch resolution
   //
   // Q5: What would happen if we removed the hazard detection logic entirely?
-  // A: [Student answer here]
+  // A: Without hazard detection, the pipeline would execute instructions with
+  //    incorrect data and wrong control flow. Load-use hazards would cause EX
+  //    stage to use stale register values, and jump/branch instructions could
+  //    jump to incorrect target addresses. This results in incorrect program
+  //    execution and unpredictable behavior.
   // Hint: Consider data hazards and control flow correctness
   //
   // Q6: Complete the stall condition summary:
   // Stall is needed when:
-  // 1. ? (EX stage condition)
-  // 2. ? (MEM stage condition)
+  // 1. There is a load-use hazard where a load instruction in the EX stage has
+  //    a destination register that matches the source register of the ID stage. (EX stage condition)
+  // 2. There is a load instruction in the MEM stage and a jump instruction in ID
+  //    stage that depends on the load destination register. (MEM stage condition)
   //
   // Flush is needed when:
-  // 1. ? (Branch/Jump condition)
+  // 1. A branch or jump instruction is taken, and the wrong-path instruction in
+  //    the IF stage must be discarded. (Branch/Jump condition)
   //
 }

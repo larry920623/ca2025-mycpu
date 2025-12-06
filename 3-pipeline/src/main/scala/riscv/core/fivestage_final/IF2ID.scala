@@ -84,9 +84,9 @@ class IF2ID extends Module {
   // TODO: Complete the instantiation and connection
   // Hint: Use Module() to instantiate PipelineRegister with appropriate default
   val instruction = Module(new PipelineRegister(defaultValue = InstructionsNop.nop))
-  instruction.io.in     := instruction.io
+  instruction.io.in     := io.instruction
   instruction.io.stall  := io.stall
-  instruction.io.flush  := io.flash
+  instruction.io.flush  := io.flush
   io.output_instruction := instruction.io.out
 
   // For instruction address register:
@@ -101,7 +101,7 @@ class IF2ID extends Module {
   // For interrupt flag register:
   // - Flush: Output 0 (no interrupt)
   // TODO: Complete the instantiation and connection
-  val interrupt_flag = Module(new PipelineRegister(Parameters.InterruptFlagBits))
+  val interrupt_flag = Module(new PipelineRegister(defaultValue = 0.U(Parameters.InterruptFlagWidth)))
   interrupt_flag.io.in     := io.interrupt_flag
   interrupt_flag.io.stall  := io.stall
   interrupt_flag.io.flush  := io.flush
